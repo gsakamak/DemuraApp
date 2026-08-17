@@ -10,6 +10,7 @@
 # Rev 1.0.5 : Changed Threshold masking to use Percentage (%) of the Maximum value 
 #             instead of an absolute value for better generalization across datasets.
 # Rev 1.0.6 : Added a login page to restrict access. ID must end with '@yitoa.co.jp' and Password must match ID.
+# Rev 1.0.7 : Fixed RuntimeWarning 'Mean of empty slice' when measuring uniformity over completely masked (NaN) areas.
 # ==========================================
 import streamlit as st
 import pandas as pd
@@ -19,6 +20,7 @@ import numpy as np
 import scipy.ndimage as ndimage
 import cv2  # Added for contour detection
 import os
+import warnings # Added to suppress expected math warnings
 
 # Page configuration
 st.set_page_config(page_title="Demura Heatmap Analyzer", layout="wide")
@@ -62,7 +64,7 @@ st.sidebar.markdown(
     <div style="text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; line-height: 1.4;">
         Copyright(c) YITOA Technology.<br>
         All rights reserved.<br>
-        Rev 1.0.6
+        Rev 1.0.7
     </div>
     """,
     unsafe_allow_html=True
@@ -75,7 +77,7 @@ fig_width = st.sidebar.slider("Heatmap Width", min_value=1.0, max_value=10.0, va
 fig_height = st.sidebar.slider("Heatmap Height", min_value=1.0, max_value=15.0, value=3.4, step=0.1)
 st.sidebar.markdown("---")
 
-# --- Sidebar for Panel Masking ---
+# --- Sidebar for Panel Masking (UPDATED to %) ---
 st.sidebar.header("🔲 Panel Masking")
 st.sidebar.write("Exclude dead areas (corners, camera holes) from stats.")
 enable_mask = st.sidebar.checkbox("Enable Masking", value=True)
@@ -200,24 +202,28 @@ def calculate_uniformity(data, gx, gy, m, s_type, s_param):
     x_coords = np.linspace(m, w - 1 - m, gx, dtype=int)
     sampled_means = []
     
-    for cy in y_coords:
-        for cx in x_coords:
-            if s_type == "1 Pixel (Point)":
-                sampled_means.append(data[cy, cx])
-            elif s_type == "Square (N x N)":
-                half = s_param // 2
-                y0, y1 = max(0, cy - half), min(h, cy + half + 1)
-                x0, x1 = max(0, cx - half), min(w, cx + half + 1)
-                sampled_means.append(np.nanmean(data[y0:y1, x0:x1]))
-            elif s_type in ["Circle (Radius R)", "Probe (Auto Calculate)"]:
-                r = s_param
-                y0, y1 = max(0, cy - r), min(h, cy + r + 1)
-                x0, x1 = max(0, cx - r), min(w, cx + r + 1)
-                Y, X = np.ogrid[y0-cy:y1-cy, x0-cx:x1-cx]
-                mask = X**2 + Y**2 <= r**2
-                region = data[y0:y1, x0:x1]
-                sampled_means.append(np.nanmean(region[mask]))
+    # 測定スポットが完全にNaN(マスク領域)に落ちた場合の警告を抑制する
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        for cy in y_coords:
+            for cx in x_coords:
+                if s_type == "1 Pixel (Point)":
+                    sampled_means.append(data[cy, cx])
+                elif s_type == "Square (N x N)":
+                    half = s_param // 2
+                    y0, y1 = max(0, cy - half), min(h, cy + half + 1)
+                    x0, x1 = max(0, cx - half), min(w, cx + half + 1)
+                    sampled_means.append(np.nanmean(data[y0:y1, x0:x1]))
+                elif s_type in ["Circle (Radius R)", "Probe (Auto Calculate)"]:
+                    r = s_param
+                    y0, y1 = max(0, cy - r), min(h, cy + r + 1)
+                    x0, x1 = max(0, cx - r), min(w, cx + r + 1)
+                    Y, X = np.ogrid[y0-cy:y1-cy, x0-cx:x1-cx]
+                    mask = X**2 + Y**2 <= r**2
+                    region = data[y0:y1, x0:x1]
+                    sampled_means.append(np.nanmean(region[mask]))
     
+    # NaNになっているスポットを除外してUniformityを計算
     valid_means = [v for v in sampled_means if not np.isnan(v)]
     if not valid_means:
         return np.nan
