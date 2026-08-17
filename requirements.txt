@@ -1,4 +1,6 @@
 streamlit
 pandas
+matplotlib
 numpy
-plotly
+scipy
+opencv-python-headless
