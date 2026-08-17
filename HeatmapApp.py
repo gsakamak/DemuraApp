@@ -11,6 +11,7 @@
 #             instead of an absolute value for better generalization across datasets.
 # Rev 1.0.6 : Added a login page to restrict access. ID must end with '@yitoa.co.jp' and Password must match ID.
 # Rev 1.0.7 : Fixed RuntimeWarning 'Mean of empty slice' when measuring uniformity over completely masked (NaN) areas.
+# Rev 1.0.9 : Increased precision of Sigma Multiplier (N) input to 5 decimal places.
 # ==========================================
 import streamlit as st
 import pandas as pd
@@ -64,7 +65,7 @@ st.sidebar.markdown(
     <div style="text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; line-height: 1.4;">
         Copyright(c) YITOA Technology.<br>
         All rights reserved.<br>
-        Rev 1.0.7
+        Rev 1.0.9
     </div>
     """,
     unsafe_allow_html=True
@@ -312,7 +313,7 @@ if uploaded_files:
                             user_vmin = sc1.number_input("Display Min", value=actual_min, key=f"vmin_{file.name}_{i}_{idx}")
                             user_vmax = sc2.number_input("Display Max", value=actual_max, key=f"vmax_{file.name}_{i}_{idx}")
                         else:
-                            sigma_n = st.number_input("Sigma Multiplier (N)", value=3.0, step=0.5, key=f"sigma_{file.name}_{i}_{idx}")
+                            sigma_n = st.number_input("Sigma Multiplier (N)", value=3.0, step=0.00001, format="%.5f", key=f"sigma_{file.name}_{i}_{idx}")
                             user_vmin = actual_ave - (sigma_n * actual_std)
                             user_vmax = actual_ave + (sigma_n * actual_std)
 
@@ -390,7 +391,7 @@ if uploaded_files:
                                 user_vmin_diff = sc1.number_input("Display Min", value=actual_min, key="vmin_diff")
                                 user_vmax_diff = sc2.number_input("Display Max", value=actual_max, key="vmax_diff")
                             else:
-                                sigma_n_diff = st.number_input("Sigma (N)", value=3.0, step=0.5, key="sigma_diff")
+                                sigma_n_diff = st.number_input("Sigma (N)", value=3.0, step=0.00001, format="%.5f", key="sigma_diff")
                                 user_vmin_diff, user_vmax_diff = actual_ave - (sigma_n_diff * actual_std), actual_ave + (sigma_n_diff * actual_std)
                             
                             _, center_col, _ = st.columns([1, 1, 1])
